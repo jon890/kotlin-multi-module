@@ -1,0 +1,35 @@
+[versions]
+# Kotlin 관련 버전 - Kotlin 2.1.0 (2024년 최신 안정화 버전)
+kotlin = "2.1.0"
+
+# Spring Boot 관련 버전 - 현재 최신 안정화 버전
+springBoot = "3.4.1"
+springDependencyManagement = "1.1.7"
+
+# Gradle 플러그인 버전
+foojayResolverConvention = "0.8.0"
+
+# Java 버전 - Java 21 LTS 사용 (Kotlin 2.x 및 Spring Boot 3.x 완전 지원)
+java = "21"
+
+[libraries]
+# Spring Boot 라이브러리 - 케밥케이스 방식으로 변경
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+
+[plugins]
+# Kotlin 플러그인들 - 케밥케이스 방식으로 변경
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+kotlin-jpa = { id = "org.jetbrains.kotlin.plugin.jpa", version.ref = "kotlin" }
+kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "kotlin" }
+
+# Spring Boot 플러그인들
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "springDependencyManagement" }
+
+# Gradle 도구 플러그인
+foojay-resolver-convention = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "foojayResolverConvention" }
+
+# [bundles]
+# 번들은 라이브러리만 포함할 수 있으므로, 플러그인 번들은 주석 처리

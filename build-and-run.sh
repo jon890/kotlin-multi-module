@@ -2,7 +2,7 @@
 
 echo "Build and Run Start"
 
-BASE_PATH=/d/project/kotlin-multi-module
+BASE_PATH=~/personal/kotlin-multi-module
 
 cd $BASE_PATH
 

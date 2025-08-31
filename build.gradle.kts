@@ -2,17 +2,15 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
-    kotlin("jvm") version "1.9.25"
-    kotlin("kapt") version "1.9.25"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.kapt)
 
-    kotlin("plugin.spring") version "1.9.25" apply false
-    kotlin("plugin.jpa") version "1.9.25" apply false
+    alias(libs.plugins.kotlin.spring) apply false
+    alias(libs.plugins.kotlin.jpa) apply false
 
-    id("org.springframework.boot") version "3.4.1" apply false
-    id("io.spring.dependency-management") version "1.1.7" apply false
+    alias(libs.plugins.spring.boot) apply false
+    alias(libs.plugins.spring.dependency.management) apply false
 }
-
-java.sourceCompatibility = JavaVersion.VERSION_17
 
 allprojects {
     group = "com.bifos"
@@ -20,19 +18,6 @@ allprojects {
 
     repositories {
         mavenCentral()
-    }
-
-    tasks {
-        withType<KotlinCompile> {
-            kotlinOptions {
-                freeCompilerArgs = listOf("-Xjsr305=strict")
-                jvmTarget = "17"
-            }
-        }
-
-        withType<Test> {
-            useJUnitPlatform()
-        }
     }
 }
 
@@ -47,7 +32,25 @@ subprojects {
         plugin("io.spring.dependency-management")
     }
 
+    // JVM Toolchain을 사용하여 모든 작업이 동일한 Java 버전 사용
+    java {
+        toolchain {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    }
+
     tasks {
+        withType<KotlinCompile> {
+            compilerOptions {
+                freeCompilerArgs.addAll("-Xjsr305=strict")
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+            }
+        }
+
+        withType<Test> {
+            useJUnitPlatform()
+        }
+
         withType<BootJar> {
             enabled = false
         }
