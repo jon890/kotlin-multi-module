@@ -43,3 +43,14 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# Custom additions
+# Logs directory - not tracked in git
+logs/
+*.log
+
+# OpenSearch data  
+data/
+
+# Temporary observability files
+observability/*.json

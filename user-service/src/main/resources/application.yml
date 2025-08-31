@@ -1,0 +1,57 @@
+# Spring Boot Application Configuration
+spring:
+  application:
+    name: user-service
+  profiles:
+    active: local
+  # Java 21 Virtual Threads 활성화 (2025년 최신 트렌드)
+  threads:
+    virtual:
+      enabled: true
+
+# Management endpoints (Spring Boot Actuator)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# Logging configuration
+logging:
+  config: classpath:logback-spring.xml
+  level:
+    com.bifos.userservice: DEBUG
+    org.springframework: INFO
+    io.opentelemetry: INFO
+
+---
+# Docker profile
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+logging:
+  file:
+    name: /app/logs/user-service.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+
+---
+# Local development profile
+spring:
+  config:
+    activate:
+      on-profile: local
+
+logging:
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr([%thread]){blue} %clr(%-5level){highlight} %clr([%X{traceId},%X{spanId}]){yellow} %clr(%logger{36}){cyan} %clr(-){faint} %msg%n"
