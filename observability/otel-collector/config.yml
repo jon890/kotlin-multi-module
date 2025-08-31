@@ -1,0 +1,106 @@
+# OpenTelemetry Collector Configuration
+# 최신 OTLP 프로토콜과 OpenSearch 통합을 위한 설정
+
+receivers:
+  # OTLP gRPC receiver - 가장 성능이 좋은 프로토콜
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+
+  # Prometheus metrics receiver (향후 메트릭 수집용)
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "otel-collector"
+          scrape_interval: 10s
+          static_configs:
+            - targets: ["0.0.0.0:8889"]
+
+processors:
+  # Batch processor - 성능 최적화를 위한 배치 처리
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+  # Resource processor - 리소스 속성 추가/변경
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "development"
+        action: upsert
+      - key: service.instance.id
+        from_attribute: host.name
+        action: insert
+
+  # Memory limiter - OOM 방지
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+exporters:
+  # Logging exporter - 디버깅용
+  logging:
+    loglevel: info
+
+    # Elasticsearch exporter - OpenSearch 호환 (간단한 설정)
+  elasticsearch:
+    endpoints: [http://opensearch:9200]
+    logs_index: logs-2025.08.31
+    traces_index: traces-2025.08.31
+    metrics_index: metrics-2025.08.31
+
+  # Prometheus exporter - 메트릭 데이터 노출
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      environment: development
+      service: otel-collector
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  # Performance profiler
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # Memory ballast extension - 메모리 안정성
+  memory_ballast:
+    size_mib: 128
+
+service:
+  extensions: [health_check, pprof, memory_ballast]
+
+  pipelines:
+    # 로그 파이프라인
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [logging, elasticsearch]
+
+    # 트레이스 파이프라인
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [logging, elasticsearch]
+
+    # 메트릭 파이프라인
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, resource, batch]
+      exporters: [logging, prometheus]
+
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: 0.0.0.0:8888

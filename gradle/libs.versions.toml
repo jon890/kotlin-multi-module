@@ -6,6 +6,11 @@ kotlin = "2.1.0"
 springBoot = "3.4.1"
 springDependencyManagement = "1.1.7"
 
+# OpenTelemetry 관련 버전 (2025년 8월 최신)
+opentelemetry = "1.40.0"
+opentelemetryAlpha = "1.40.0-alpha"
+opentelemetryInstrumentation = "2.6.0"
+
 # Gradle 플러그인 버전
 foojayResolverConvention = "0.8.0"
 
@@ -15,6 +20,18 @@ java = "21"
 [libraries]
 # Spring Boot 라이브러리 - 케밥케이스 방식으로 변경
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+
+# OpenTelemetry 라이브러리
+opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetry" }
+opentelemetry-api = { module = "io.opentelemetry:opentelemetry-api" }
+opentelemetry-instrumentation-bom = { module = "io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom", version.ref = "opentelemetryInstrumentation" }
+opentelemetry-annotations = { module = "io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations" }
+
+# Logback 및 Jackson (구조화된 로깅용)
+logback-classic = { module = "ch.qos.logback:logback-classic" }
+logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder", version = "7.4" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
 
 [plugins]
 # Kotlin 플러그인들 - 케밥케이스 방식으로 변경

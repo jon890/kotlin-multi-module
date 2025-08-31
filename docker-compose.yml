@@ -1,0 +1,212 @@
+# OpenTelemetry 로깅 시스템 - 2025년 최신 Docker Compose 구성
+# 참고: 최신 Docker Compose는 version 필드를 자동으로 처리하므로 생략
+
+services:
+  # OpenSearch - Elasticsearch의 오픈소스 대안
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    container_name: opensearch
+    hostname: opensearch
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "29200:9200"
+      - "29600:9600"
+    volumes:
+      - type: volume
+        source: opensearch-data
+        target: /usr/share/opensearch/data
+    networks:
+      - otel-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+
+  # OpenSearch Dashboards - Kibana의 오픈소스 대안
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.1
+    container_name: opensearch-dashboards
+    hostname: opensearch-dashboards
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+      SERVER_HOST: "0.0.0.0"
+    ports:
+      - "25601:5601"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+        restart: true
+    networks:
+      - otel-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+
+  # OpenTelemetry Collector - 텔레메트리 데이터 수집/처리/전송
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    container_name: otel-collector
+    hostname: otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yml"]
+    volumes:
+      - type: bind
+        source: ./observability/otel-collector/config.yml
+        target: /etc/otelcol-contrib/config.yml
+        read_only: true
+    ports:
+      - "24317:4317"
+      - "24318:4318"
+      - "28889:8889"
+      - "23133:13133"
+    environment:
+      OTEL_RESOURCE_ATTRIBUTES: "service.name=otel-collector,service.version=0.105.0"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+        restart: true
+    networks:
+      - otel-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:13133/health || exit 1",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Fluent Bit - 경량 로그 수집기
+  fluent-bit:
+    image: fluent/fluent-bit:3.1.4
+    container_name: fluent-bit
+    hostname: fluent-bit
+    volumes:
+      - type: bind
+        source: ./observability/fluent-bit/fluent-bit.conf
+        target: /fluent-bit/etc/fluent-bit.conf
+        read_only: true
+      - type: bind
+        source: ./observability/fluent-bit/parsers.conf
+        target: /fluent-bit/etc/parsers.conf
+        read_only: true
+      - type: bind
+        source: /var/lib/docker/containers
+        target: /var/lib/docker/containers
+        read_only: true
+      - type: bind
+        source: /var/log
+        target: /var/log
+        read_only: true
+    environment:
+      FLB_LOG_LEVEL: info
+    depends_on:
+      opensearch:
+        condition: service_healthy
+        restart: true
+    networks:
+      - otel-network
+    restart: unless-stopped
+
+  # User Service Application
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+        - VCS_REF=${VCS_REF:-$(git rev-parse --short HEAD)}
+    container_name: user-service
+    hostname: user-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      OTEL_SERVICE_NAME: user-service
+      OTEL_SERVICE_VERSION: "1.0.0"
+      OTEL_RESOURCE_ATTRIBUTES: "service.name=user-service,service.version=1.0.0,deployment.environment=development"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_INSTRUMENTATION_LOGBACK_APPENDER_ENABLED: "true"
+      OTEL_JAVAAGENT_ENABLED: "true"
+      JAVA_TOOL_OPTIONS: "-javaagent:/app/opentelemetry-javaagent.jar -XX:+UseZGC -XX:+UnlockExperimentalVMOptions"
+      JVM_OPTS: "-Xms512m -Xmx1g"
+    ports:
+      - "28080:8080"
+    depends_on:
+      otel-collector:
+        condition: service_started
+        restart: true
+    networks:
+      - otel-network
+    volumes:
+      - type: bind
+        source: ./logs
+        target: /app/logs
+    restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+# 볼륨 정의 - 데이터 영속성 보장
+volumes:
+  opensearch-data:
+    driver: local
+    labels:
+      - "com.example.description=OpenSearch data volume"
+      - "com.example.service=opensearch"
+
+# 네트워크 정의 - 서비스 간 통신
+networks:
+  otel-network:
+    driver: bridge
+    name: otel-network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    labels:
+      - "com.example.description=OpenTelemetry network"
+      - "com.example.environment=development"
+
+# 확장 필드 - 공통 설정 재사용
+x-common-variables: &common-variables
+  TZ: Asia/Seoul
+  LANG: C.UTF-8
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
